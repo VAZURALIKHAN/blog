@@ -1,0 +1,31 @@
+{
+  "name": "tech-blog-mern",
+  "version": "1.0.0",
+  "description": "Full Stack Technology Blog Website using MERN Stack - inspired by Zoho Blog",
+  "main": "server/src/server.js",
+  "scripts": {
+    "start": "node server/src/server.js",
+    "server": "nodemon server/src/server.js",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm run build --prefix client",
+    "seed": "node server/src/seed/seed.js",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client"
+  },
+  "keywords": [
+    "mern",
+    "blog",
+    "technology",
+    "cms",
+    "react",
+    "nodejs",
+    "mongodb",
+    "express"
+  ],
+  "author": "VAZURALIKHAN",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.0"
+  }
+}
