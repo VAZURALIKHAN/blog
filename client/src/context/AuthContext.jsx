@@ -5,8 +5,12 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('technova_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('technova_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
   const [token, setToken] = useState(() => localStorage.getItem('technova_token') || null);
   const [loading, setLoading] = useState(true);
@@ -16,11 +20,16 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           const res = await authAPI.getMe();
-          setUser(res.data.user);
-          localStorage.setItem('technova_user', JSON.stringify(res.data.user));
+          if (res?.data?.user) {
+            setUser(res.data.user);
+            localStorage.setItem('technova_user', JSON.stringify(res.data.user));
+          }
         } catch (err) {
-          console.error('Session validation failed:', err);
-          logout();
+          console.warn('Session verification fallback:', err);
+          // Only invalidate session if backend explicitly returned 401 Unauthorized
+          if (err.response && err.response.status === 401) {
+            logout();
+          }
         }
       }
       setLoading(false);
