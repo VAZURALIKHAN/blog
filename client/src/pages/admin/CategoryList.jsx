@@ -17,7 +17,7 @@ const CategoryList = () => {
   const fetchCategories = async () => {
     try {
       const res = await categoryAPI.getCategories();
-      setCategories(res.data.data);
+      setCategories(res.data.data || []);
     } catch (err) {
       console.error(err);
     } finally {

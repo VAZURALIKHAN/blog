@@ -22,7 +22,7 @@ const Login = () => {
       await login(email, password);
       navigate('/admin');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+      setError(err.response?.data?.message || err.message || 'Invalid email or password. Use demo: admin@technova.io / admin123');
     } finally {
       setSubmitting(false);
     }

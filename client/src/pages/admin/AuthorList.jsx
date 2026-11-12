@@ -22,7 +22,7 @@ const AuthorList = () => {
   const fetchAuthors = async () => {
     try {
       const res = await authorAPI.getAuthors();
-      setAuthors(res.data.data);
+      setAuthors(res.data.data || []);
     } catch (err) {
       console.error(err);
     } finally {

@@ -34,9 +34,9 @@ const PostList = () => {
         page: currentPage,
         limit: 10,
       });
-      setPosts(res.data.data);
-      setTotalPages(res.data.totalPages);
-      setTotalPosts(res.data.total);
+      setPosts(res.data.data || []);
+      setTotalPages(res.data.totalPages || 1);
+      setTotalPosts(res.data.total || 0);
     } catch (err) {
       console.error('Failed to fetch posts:', err);
     } finally {
