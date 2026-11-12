@@ -1,10 +1,12 @@
 import axios from 'axios';
+import staticData from '../data/blogData.json';
 
 const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 3000,
 });
 
 // Interceptor to inject JWT token
@@ -24,31 +26,145 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Clear token if expired or invalid
-      if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
+      if (window.location.pathname.includes('/admin') && !window.location.pathname.includes('/admin/login')) {
         localStorage.removeItem('technova_token');
         localStorage.removeItem('technova_user');
-        window.location.href = '/admin/login';
+        window.location.hash = '#/admin/login';
       }
     }
     return Promise.reject(error);
   }
 );
 
-// API Functions
-export const authAPI = {
-  login: (data) => api.post('/auth/login', data),
-  getMe: () => api.get('/auth/me'),
+// Static fallback helpers for GitHub Pages deployment
+const getStaticPosts = ({ category = '', search = '', sort = 'latest', page = 1, limit = 9 } = {}) => {
+  let list = (staticData.posts || []).filter((p) => p.status === 'published');
+
+  if (category) {
+    list = list.filter((p) => p.category?.slug === category || p.category?._id === category);
+  }
+
+  if (search) {
+    const q = search.toLowerCase();
+    list = list.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.excerpt.toLowerCase().includes(q) ||
+        (p.tags && p.tags.some((t) => t.name.toLowerCase().includes(q)))
+    );
+  }
+
+  if (sort === 'views') {
+    list.sort((a, b) => (b.views || 0) - (a.views || 0));
+  } else if (sort === 'oldest') {
+    list.sort((a, b) => new Date(a.publishedAt) - new Date(b.publishedAt));
+  } else {
+    list.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  }
+
+  const total = list.length;
+  const totalPages = Math.ceil(total / limit) || 1;
+  const start = (page - 1) * limit;
+  const paginated = list.slice(start, start + limit);
+
+  return {
+    data: {
+      success: true,
+      total,
+      page,
+      limit,
+      totalPages,
+      data: paginated,
+    },
+  };
 };
 
 export const postAPI = {
-  getPosts: (params) => api.get('/posts', { params }),
-  getFeaturedPosts: () => api.get('/posts/featured'),
-  getTrendingPosts: () => api.get('/posts/trending'),
-  getPostBySlug: (slug) => api.get(`/posts/slug/${slug}`),
-  // Admin endpoints
-  getAdminStats: () => api.get('/posts/admin/stats'),
-  getAdminPosts: (params) => api.get('/posts/admin/all', { params }),
+  getPosts: async (params) => {
+    try {
+      return await api.get('/posts', { params });
+    } catch {
+      return getStaticPosts(params);
+    }
+  },
+
+  getFeaturedPosts: async () => {
+    try {
+      return await api.get('/posts/featured');
+    } catch {
+      const feat = (staticData.posts || []).filter((p) => p.isFeatured && p.status === 'published');
+      return { data: { success: true, count: feat.length, data: feat } };
+    }
+  },
+
+  getTrendingPosts: async () => {
+    try {
+      return await api.get('/posts/trending');
+    } catch {
+      const trending = (staticData.posts || []).filter((p) => p.isTrending && p.status === 'published');
+      return { data: { success: true, count: trending.length, data: trending } };
+    }
+  },
+
+  getPostBySlug: async (slug) => {
+    try {
+      return await api.get(`/posts/slug/${slug}`);
+    } catch {
+      const post = (staticData.posts || []).find((p) => p.slug === slug);
+      if (!post) throw new Error('Post not found');
+      
+      const related = (staticData.posts || []).filter(
+        (p) => p.category?._id === post.category?._id && p._id !== post._id && p.status === 'published'
+      ).slice(0, 3);
+
+      const pubPosts = (staticData.posts || []).filter((p) => p.status === 'published');
+      const idx = pubPosts.findIndex((p) => p._id === post._id);
+      const prev = idx > 0 ? pubPosts[idx - 1] : null;
+      const next = idx < pubPosts.length - 1 ? pubPosts[idx + 1] : null;
+
+      return {
+        data: {
+          success: true,
+          data: post,
+          relatedPosts: related,
+          previousPost: prev,
+          nextPost: next,
+        },
+      };
+    }
+  },
+
+  getAdminStats: async () => {
+    try {
+      return await api.get('/posts/admin/stats');
+    } catch {
+      const posts = staticData.posts || [];
+      return {
+        data: {
+          success: true,
+          data: {
+            totalPosts: posts.length,
+            publishedPosts: posts.filter((p) => p.status === 'published').length,
+            draftPosts: posts.filter((p) => p.status === 'draft').length,
+            scheduledPosts: posts.filter((p) => p.status === 'scheduled').length,
+            totalViews: posts.reduce((acc, p) => acc + (p.views || 0), 0),
+            totalCategories: staticData.categories?.length || 7,
+            totalAuthors: staticData.authors?.length || 4,
+            recentPosts: posts.slice(0, 5),
+          },
+        },
+      };
+    }
+  },
+
+  getAdminPosts: async (params) => {
+    try {
+      return await api.get('/posts/admin/all', { params });
+    } catch {
+      return { data: { success: true, data: staticData.posts || [] } };
+    }
+  },
+
   getAdminPostById: (id) => api.get(`/posts/admin/${id}`),
   createPost: (data) => api.post('/posts/admin', data),
   updatePost: (id, data) => api.put(`/posts/admin/${id}`, data),
@@ -56,7 +172,13 @@ export const postAPI = {
 };
 
 export const categoryAPI = {
-  getCategories: () => api.get('/categories'),
+  getCategories: async () => {
+    try {
+      return await api.get('/categories');
+    } catch {
+      return { data: { success: true, data: staticData.categories || [] } };
+    }
+  },
   getCategoryBySlug: (slug) => api.get(`/categories/slug/${slug}`),
   createCategory: (data) => api.post('/categories', data),
   updateCategory: (id, data) => api.put(`/categories/${id}`, data),
@@ -64,26 +186,61 @@ export const categoryAPI = {
 };
 
 export const authorAPI = {
-  getAuthors: () => api.get('/authors'),
+  getAuthors: async () => {
+    try {
+      return await api.get('/authors');
+    } catch {
+      return { data: { success: true, data: staticData.authors || [] } };
+    }
+  },
   getAuthorById: (id) => api.get(`/authors/${id}`),
   createAuthor: (data) => api.post('/authors', data),
   updateAuthor: (id, data) => api.put(`/authors/${id}`, data),
   deleteAuthor: (id) => api.delete(`/authors/${id}`),
 };
 
+export const authAPI = {
+  login: async (credentials) => {
+    try {
+      return await api.post('/auth/login', credentials);
+    } catch (err) {
+      // Demo fallback login for static environments
+      if (credentials.email === 'admin@technova.io' && credentials.password === 'admin123') {
+        const demoUser = staticData.users?.[0] || {
+          _id: 'admin_static_id',
+          name: 'Chief Editor',
+          email: 'admin@technova.io',
+          role: 'admin',
+        };
+        const demoToken = 'mock_jwt_token_for_static_demo_environment';
+        return { data: { success: true, token: demoToken, user: demoUser } };
+      }
+      throw err;
+    }
+  },
+  getMe: () => api.get('/auth/me'),
+};
+
 export const tagAPI = {
-  getTags: () => api.get('/tags'),
-  createTag: (data) => api.post('/tags', data),
-  deleteTag: (id) => api.delete(`/tags/${id}`),
+  getTags: async () => {
+    try {
+      return await api.get('/tags');
+    } catch {
+      return { data: { success: true, data: staticData.tags || [] } };
+    }
+  },
 };
 
 export const uploadAPI = {
   uploadImage: (formData) =>
     api.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
     }),
+};
+
+export const settingsAPI = {
+  getSettings: () => api.get('/settings'),
+  updateSettings: (data) => api.put('/settings', data),
 };
 
 export default api;
