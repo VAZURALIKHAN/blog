@@ -177,5 +177,11 @@ To log into the Admin Management Panel, visit `/admin/login` and use:
 
 ---
 
+## 👨‍💻 Author & Contributor
+- **Author:** [VAZURALIKHAN](https://github.com/VAZURALIKHAN)
+- **Repository:** [https://github.com/VAZURALIKHAN/blog](https://github.com/VAZURALIKHAN/blog)
+
+---
+
 ## 📄 License
 MIT License. Built for enterprise technology publishing.
